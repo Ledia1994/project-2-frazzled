@@ -1,0 +1,72 @@
+###run_tophat.qsub
+
+#!/bin/bash -l
+#$ -P bf528
+#$ -cwd
+#$ -j y
+#$ -pe mpi_16_tasks_per_node 16
+echo "Running job $JOB_ID"
+echo "Started: $(date +%F)"
+echo "Running in directory: $PWD"
+#module load commands
+module load python2
+module load samtools/0.1.19
+module load bowtie2
+module load boost
+module load tophat
+tophat -r 200 -G /project/bf528/project_2/reference/annot/mm9.gtf --segment-length=20 --segment-mismatches=1 --no-novel-juncs -o P0_1_tophat -p 16 /project/bfbf528/project_2/reference/mm9 /projectnb/bf528/users/frazzled/project_2/project-2-frazzled/P0_1_1.fastq /projectnb/bf528/users/frazzled/project_2/project-2-frazzled/P0_1_2.fastq
+
+echo "Job finished: $(date +%F)"
+
+### run_RseQC.qsub
+
+#!/bin/bash -l
+#$ -P bf528
+#$ -cwd
+#$ -j y
+#$ -pe mpi_16_tasks_per_node 16
+## modules load commands
+module load python3
+module load rseqc/3.0.0
+module load samtools/0.1.19
+module load R
+geneBody_coverage.py -i accepted_hits.bam -r /project/bf528/project_2/reference/annot/mm9.bed -o Rsgenebody
+inner_distance.py -i accepted_hits.bam -r /project/bf528/project_2/reference/annot/mm9.bed -o Rsdistance
+bam_stat.py -i accepted_hits.bam
+
+###run_cufflinks.qsub
+#!/bin/bash -l
+#$ -P bf528
+#$ -cwd
+#$ -j y
+#$ -pe mpi_16_tasks_per_node 16
+echo "Running job $JOB_ID"
+echo "Started: $(date +%F)"
+echo "Running in directory: $PWD"
+#module load commands
+module load cufflinks
+cufflinks --compatible-hits-norm -G /project/bf528/project_2/reference/annot/mm9.gtf -b /project/bf528/project_2/reference/mm9.fa -u -o P0_1_cufflinks -p 16 P0_1_tophat/accepted_hits.sam
+echo "Job finished: $(date +%F)"
+
+
+
+
+
+#Run_cuffdiff.qsub
+
+#!/bin/bash -l
+#$ -cwd
+#$ -P bf528
+#$ -j y
+#$ -pe mpi_16_tasks_per_node 16
+#$ -l h_rt=48:00:00
+source /etc/bashrc
+module load cufflinks
+P0BAM=/projectnb/bf528/users/frazzled/project_2/ledia/P0_1_tophat/accepted_hits.bam
+SAMPLEDIR=/project/bf528/project_2/data/samples/
+P0REPS=$P0BAM,$SAMPLEDIR/P0_2/accepted_hits.bam
+ADREPS=$SAMPLEDIR/Ad_1/accepted_hits.bam,$SAMPLEDIR/Ad_2/accepted_hits.bam
+LABEL="P0,Ad"
+OUTDIR=cuffdiff_out
+FASTA=/project/bf528/project_2/reference/mm9.fa
+cuffdiff -p 16 -L $LABEL -u -b $FASTA -o $OUTDIR $SAMPLEDIR/merged_asm/merged.gtf $P0REPS $ADREPS
